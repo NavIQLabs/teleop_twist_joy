@@ -117,7 +117,7 @@ namespace teleop_twist_joy
         std::bind(&TeleopTwistJoy::Impl::joyCallback, this->pimpl_, std::placeholders::_1));
 
     // Publish to autonomous topic (bool)
-    pimpl_->autonomous_pub = this->create_publisher<std_msgs::msg::Bool>("autonomous", 10);
+    pimpl_->autonomous_pub = this->create_publisher<std_msgs::msg::Bool>("is_autonomous", 10);
 
     // Button ids
     pimpl_->go_autonomous_button = this->declare_parameter("go_autonomous_button", 0);
@@ -421,14 +421,18 @@ namespace teleop_twist_joy
     if (static_cast<int>(joy_msg->buttons.size()) > freeze_button &&
         joy_msg->buttons[freeze_button])
     {
-      auto cmd_vel_msg = std::make_unique<geometry_msgs::msg::Twist>();
-      cmd_vel_msg->linear.x = 0.0;
-      cmd_vel_msg->linear.y = 0.0;
-      cmd_vel_msg->linear.z = 0.0;
-      cmd_vel_msg->angular.x = 0.0;
-      cmd_vel_msg->angular.y = 0.0;
-      cmd_vel_msg->angular.z = 0.0;
-      cmd_vel_pub->publish(std::move(cmd_vel_msg));
+        if (publish_stamped_twist)
+        {
+          auto cmd_vel_stamped_msg = std::make_unique<geometry_msgs::msg::TwistStamped>();
+          cmd_vel_stamped_msg->header.stamp = clock->now();
+          cmd_vel_stamped_msg->header.frame_id = frame_id;
+          cmd_vel_stamped_pub->publish(std::move(cmd_vel_stamped_msg));
+        }
+        else
+        {
+          auto cmd_vel_msg = std::make_unique<geometry_msgs::msg::Twist>();
+          cmd_vel_pub->publish(std::move(cmd_vel_msg));
+        }
     }
 
     // Sit button
