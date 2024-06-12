@@ -71,6 +71,7 @@ namespace teleop_twist_joy
     bool require_enable_button;
     int64_t enable_button;
     int64_t enable_turbo_button;
+    std::string output_topic;
 
     // int64 to store button ids
     int64_t go_autonomous_button;
@@ -102,15 +103,17 @@ namespace teleop_twist_joy
 
     pimpl_->publish_stamped_twist = this->declare_parameter("publish_stamped_twist", false);
     pimpl_->frame_id = this->declare_parameter("frame", "teleop_twist_joy");
+    pimpl_->output_topic = this->declare_parameter("output_topic", "cmd_vel_joystick");
 
     if (pimpl_->publish_stamped_twist)
     {
       pimpl_->cmd_vel_stamped_pub = this->create_publisher<geometry_msgs::msg::TwistStamped>(
-          "cmd_vel", 10);
+        this->get_parameter("output_topic").as_string(), 10);
     }
     else
     {
-      pimpl_->cmd_vel_pub = this->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
+      pimpl_->cmd_vel_pub = this->create_publisher<geometry_msgs::msg::Twist>(
+        this->get_parameter("output_topic").as_string(), 10);
     }
     pimpl_->joy_sub = this->create_subscription<sensor_msgs::msg::Joy>(
         "joy", rclcpp::QoS(10),
@@ -332,6 +335,8 @@ namespace teleop_twist_joy
     };
 
     callback_handle = this->add_on_set_parameters_callback(param_callback);
+
+    RCLCPP_INFO(this->get_logger(), "TeleopTwistJoy node has been started.");
   }
 
   TeleopTwistJoy::~TeleopTwistJoy()
@@ -395,12 +400,12 @@ namespace teleop_twist_joy
   {
 
     // Upon any button press except go_autonomous, publish false to autonomous topic
-    const double joystick_threshold = 0.1;
+    const double joystick_threshold = 0.01;
     if (static_cast<int>(joy_msg->buttons.size()) > go_autonomous_button &&
         joy_msg->buttons[go_autonomous_button] == 0 &&
         std::any_of(joy_msg->buttons.begin(), joy_msg->buttons.end(), [](int i)
                     { return i != 0; }) &&
-        std::any_of(joy_msg->axes.begin(), joy_msg->axes.end(), [](double i)
+        std::any_of(joy_msg->axes.begin(), joy_msg->axes.end(), [joystick_threshold](double i)
                     { return std::fabs(i) > joystick_threshold;}))
     {
       auto autonomous_msg = std::make_unique<std_msgs::msg::Bool>();
